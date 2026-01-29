@@ -186,10 +186,13 @@ do_install() {
   fi
 
   # --- Moltbot CLI ---
+  # Ensure PATH includes user npm global bin (molt.bot/install.sh installs to ~/.npm-global/bin)
+  export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
   if ! command -v moltbot &>/dev/null; then
     log "Installing Moltbot CLI..."
     curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm 2>/dev/null || \
     curl -fsSL https://molt.bot/install.sh | bash -s -- 2>/dev/null || true
+    export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
     if ! command -v moltbot &>/dev/null; then
       npm install -g moltbot@latest 2>/dev/null || pnpm add -g moltbot@latest 2>/dev/null || {
         err "Could not install moltbot. Try: npm install -g moltbot@latest"
@@ -197,7 +200,12 @@ do_install() {
       }
     fi
   fi
-  log "Moltbot CLI: $(moltbot --version 2>/dev/null || echo 'installed')"
+  MOLTBOT_BIN="$(command -v moltbot)"
+  if [[ -z "$MOLTBOT_BIN" ]]; then
+    err "moltbot not found on PATH. Add ~/.npm-global/bin to PATH and re-run."
+    exit 1
+  fi
+  log "Moltbot CLI: $("$MOLTBOT_BIN" --version 2>/dev/null || echo 'installed')"
 
   # --- Directories ---
   mkdir -p "$CLAWDBOT_DIR" "$CLAWD_DIR"
@@ -209,7 +217,7 @@ do_install() {
   echo
   log "Running full Moltbot setup. You will choose auth (Z.ai, Anthropic, OpenAI, etc.) and channels (WhatsApp, Telegram, Discord, etc.)."
   echo
-  moltbot onboard --install-daemon
+  "$MOLTBOT_BIN" onboard --install-daemon
   echo
 
   # --- VPS lock-down: ensure gateway is loopback-only and has auth ---
@@ -240,10 +248,10 @@ do_install() {
   # --- Doctor ---
   export CLAWDBOT_CONFIG_PATH="$CONFIG_PATH"
   export CLAWDBOT_STATE_DIR="$CLAWDBOT_DIR"
-  if moltbot doctor --non-interactive 2>/dev/null; then
+  if "$MOLTBOT_BIN" doctor --non-interactive 2>/dev/null; then
     log "moltbot doctor OK"
   else
-    moltbot doctor 2>/dev/null || true
+    "$MOLTBOT_BIN" doctor 2>/dev/null || true
   fi
 
   # --- Fallback systemd unit if daemon not already installed by wizard ---
@@ -259,7 +267,7 @@ After=network.target
 Type=simple
 Environment=CLAWDBOT_CONFIG_PATH=$CONFIG_PATH
 Environment=CLAWDBOT_STATE_DIR=$CLAWDBOT_DIR
-ExecStart=$(command -v moltbot) gateway --port 18789 --bind loopback
+ExecStart=$MOLTBOT_BIN gateway --port 18789 --bind loopback
 Restart=on-failure
 RestartSec=10
 
