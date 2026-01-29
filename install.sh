@@ -191,49 +191,78 @@ do_install() {
   # --- Moltbot CLI ---
   # Ensure PATH includes user npm global bin (molt.bot/install.sh installs to ~/.npm-global/bin)
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
-  # Remove existing Moltbot install so we do a clean install
+  
+  # Always remove existing Moltbot CLI so we do a clean install (service/data handled by moltbot uninstall)
+  log "Checking for existing Moltbot installation..."
   if command -v moltbot &>/dev/null; then
-    log "Removing existing Moltbot install..."
-    moltbot uninstall --yes 2>/dev/null || moltbot uninstall 2>/dev/null || true
-    npm uninstall -g moltbot 2>/dev/null || true
-    # Remove user install locations so upstream installer does a fresh install
-    rm -rf "${HOME}/.npm-global/bin/moltbot" "${HOME}/.npm-global/lib/node_modules/moltbot" 2>/dev/null || true
-    rm -rf "${HOME}/.local/bin/moltbot" "${HOME}/.local/lib/node_modules/moltbot" 2>/dev/null || true
-    unset MOLTBOT_BIN
+    log "Removing existing Moltbot CLI..."
+    moltbot uninstall --all --yes 2>/dev/null || moltbot uninstall --yes 2>/dev/null || moltbot uninstall 2>/dev/null || true
   fi
-  if ! command -v moltbot &>/dev/null; then
-    log "Installing Moltbot CLI..."
-    # Upstream installer may run doctor at the end; it can fail until config exists — we run onboard next
-    ( curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm 2>/dev/null ) || \
-    ( curl -fsSL https://molt.bot/install.sh | bash -s -- 2>/dev/null ) || true
-    export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
-    if ! command -v moltbot &>/dev/null; then
-      npm install -g moltbot@latest 2>/dev/null || pnpm add -g moltbot@latest 2>/dev/null || {
-        err "Could not install moltbot. Try: npm install -g moltbot@latest"
-        exit 1
-      }
-    fi
+  # Remove npm global packages and common install locations
+  npm uninstall -g moltbot 2>/dev/null || true
+  rm -f "${HOME}/.npm-global/bin/moltbot" "${HOME}/.npm-global/bin/clawdbot" 2>/dev/null || true
+  rm -rf "${HOME}/.npm-global/lib/node_modules/moltbot" 2>/dev/null || true
+  rm -f "${HOME}/.local/bin/moltbot" "${HOME}/.local/bin/clawdbot" 2>/dev/null || true
+  rm -rf "${HOME}/.local/lib/node_modules/moltbot" 2>/dev/null || true
+  # Clear bash's command cache so it finds the new binary after install
+  hash -r 2>/dev/null || true
+  
+  log "Installing Moltbot CLI (fresh install)..."
+  # Install moltbot via npm directly (simpler and more reliable than piping installer)
+  # First ensure npm global directory exists and is configured
+  mkdir -p "${HOME}/.npm-global/lib" "${HOME}/.npm-global/bin"
+  npm config set prefix "${HOME}/.npm-global" 2>/dev/null || true
+  
+  # Install moltbot (use || true to prevent set -e from exiting on failure)
+  npm install -g moltbot@latest || {
+    log "npm install failed, trying upstream installer..."
+    curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm || true
+  }
+  
+  # Update PATH and clear hash again
+  export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
+  hash -r 2>/dev/null || true
+  
+  # Verify installation
+  MOLTBOT_BIN=""
+  if [[ -x "${HOME}/.npm-global/bin/moltbot" ]]; then
+    MOLTBOT_BIN="${HOME}/.npm-global/bin/moltbot"
+  elif command -v moltbot &>/dev/null; then
+    MOLTBOT_BIN="$(command -v moltbot)"
   fi
-  MOLTBOT_BIN="$(command -v moltbot)"
-  if [[ -z "$MOLTBOT_BIN" ]]; then
-    err "moltbot not found on PATH. Add ~/.npm-global/bin to PATH and re-run."
+  
+  if [[ -z "$MOLTBOT_BIN" || ! -x "$MOLTBOT_BIN" ]]; then
+    err "moltbot not found after install. PATH=${PATH}"
+    err "Checked: ${HOME}/.npm-global/bin/moltbot"
+    ls -la "${HOME}/.npm-global/bin/" 2>/dev/null || true
     exit 1
   fi
-  log "Moltbot CLI: $("$MOLTBOT_BIN" --version 2>/dev/null || echo 'installed')"
+  log "Moltbot CLI installed: $MOLTBOT_BIN"
+  log "Version: $("$MOLTBOT_BIN" --version 2>/dev/null || echo 'unknown')"
 
   # --- Directories ---
   mkdir -p "$CLAWDBOT_DIR" "$CLAWD_DIR"
   chmod 700 "$CLAWDBOT_DIR"
+  
+  # Remove any stale config so wizard runs fresh (old installs may have clawdbot.json)
+  rm -f "$CLAWDBOT_DIR/clawdbot.json" "$CLAWDBOT_DIR/moltbot.json" 2>/dev/null || true
 
   CONFIG_PATH="${CLAWDBOT_CONFIG_PATH:-$CLAWDBOT_DIR/moltbot.json}"
   export CLAWDBOT_CONFIG_PATH="$CONFIG_PATH"
   export CLAWDBOT_STATE_DIR="$CLAWDBOT_DIR"
+  log "Config will be at: $CONFIG_PATH"
 
   # --- Full Moltbot onboard (interactive wizard) ---
   echo
-  log "Running full Moltbot setup. You will choose auth (Z.ai, Anthropic, OpenAI, etc.) and channels (WhatsApp, Telegram, Discord, etc.)."
+  log "=========================================="
+  log "Running Moltbot setup wizard (interactive)"
+  log "You will choose:"
+  log "  - AI provider (Z.ai, Anthropic, OpenAI, etc.)"
+  log "  - Channels (WhatsApp, Telegram, Discord, etc.)"
+  log "=========================================="
   echo
-  "$MOLTBOT_BIN" onboard --install-daemon
+  # Run onboard; if it fails, we continue anyway and let user run it manually later
+  "$MOLTBOT_BIN" onboard --install-daemon || log "Onboard wizard exited with error (you can re-run later: moltbot onboard)"
   echo
 
   # --- VPS lock-down: ensure gateway is loopback-only and has auth ---
