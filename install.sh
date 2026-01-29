@@ -221,11 +221,9 @@ do_install() {
   
   # Use the official Moltbot installer (the npm "moltbot" package is a placeholder)
   # The installer knows the correct package name and install method
+  # Note: installer may try to run its own setup at the end which can fail without TTY - that's OK
   log "Running Moltbot upstream installer..."
-  curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt || {
-    err "Moltbot installer failed"
-    exit 1
-  }
+  curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt || log "Installer exited with error (may be OK if binary was installed)"
   
   # Update PATH and clear hash
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
