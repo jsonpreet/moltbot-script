@@ -128,7 +128,7 @@ do_install() {
     export CLAWDBOT_ALREADY_DROPPED=1
     log "Re-running install as user: $RUN_USER"
     # Pass through flags so child script parses --no-fail2ban / --no-firewall
-    exec su - "$RUN_USER" -c "cd '$PWD' && CLAWDBOT_ALREADY_DROPPED=1 bash -s -- $(printf '%q ' "$@")" < "$0"
+    exec su - "$RUN_USER" -c "CLAWDBOT_ALREADY_DROPPED=1 bash -s -- $(printf '%q ' "$@")" < "$0"
     exit 0
   fi
   fi
