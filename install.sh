@@ -289,12 +289,12 @@ do_install() {
       chmod 600 "$CLAWDBOT_DIR/gateway-token.txt"
       log "Generated gateway token; saved to $CLAWDBOT_DIR/gateway-token.txt"
       jq --arg t "$GATEWAY_TOKEN" '
-        .gateway = ((.gateway // {}) + { mode: "local", bind: "loopback", port: 18789, auth: { mode: "token", token: $t } });
+        .gateway = ((.gateway // {}) + { mode: "local", bind: "loopback", port: 18789, auth: { mode: "token", token: $t } }) |
         .discovery = ((.discovery // {}) + { mdns: { mode: "off" } })
       ' "$CONFIG_PATH" > "$CONFIG_PATH.tmp" && mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
     else
       jq '
-        .gateway = ((.gateway // {}) + { mode: "local", bind: "loopback", port: 18789 });
+        .gateway = ((.gateway // {}) + { mode: "local", bind: "loopback", port: 18789 }) |
         .discovery = ((.discovery // {}) + { mdns: { mode: "off" } })
       ' "$CONFIG_PATH" > "$CONFIG_PATH.tmp" && mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
     fi
