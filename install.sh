@@ -152,9 +152,12 @@ do_install() {
     fi
     ensure_run_user
     if [[ -n "$RUN_USER" ]]; then
+      # Copy script to /tmp so we can run it without redirecting stdin; then onboard wizard gets a TTY and can prompt
+      INSTALL_SCRIPT="/tmp/moltbot-install-$$.sh"
+      cp "$0" "$INSTALL_SCRIPT" && chmod 755 "$INSTALL_SCRIPT" || { err "Could not copy script to $INSTALL_SCRIPT"; exit 1; }
       export CLAWDBOT_ALREADY_DROPPED=1
-      log "Re-running install as user: $RUN_USER"
-      exec su - "$RUN_USER" -c "CLAWDBOT_ALREADY_DROPPED=1 bash -s -- $(printf '%q ' "$@")" < "$0"
+      log "Re-running install as user: $RUN_USER (interactive wizard will run next)"
+      exec su - "$RUN_USER" -c "CLAWDBOT_ALREADY_DROPPED=1 MOLTBOT_INSTALL_SCRIPT=$INSTALL_SCRIPT bash $INSTALL_SCRIPT $(printf '%q ' "$@")"
       exit 0
     fi
   fi
@@ -330,6 +333,8 @@ EOF
   echo
   echo "Docs: https://docs.molt.bot/"
   echo
+  # Remove temp script copy used for re-exec (so onboard had a TTY)
+  [[ -n "${MOLTBOT_INSTALL_SCRIPT:-}" && -f "${MOLTBOT_INSTALL_SCRIPT}" ]] && rm -f "${MOLTBOT_INSTALL_SCRIPT}" 2>/dev/null || true
 }
 
 do_install "$@"
