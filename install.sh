@@ -190,8 +190,9 @@ do_install() {
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
   if ! command -v moltbot &>/dev/null; then
     log "Installing Moltbot CLI..."
-    curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm 2>/dev/null || \
-    curl -fsSL https://molt.bot/install.sh | bash -s -- 2>/dev/null || true
+    # Upstream installer may run doctor at the end; it can fail until config exists — we run onboard next
+    ( curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm 2>/dev/null ) || \
+    ( curl -fsSL https://molt.bot/install.sh | bash -s -- 2>/dev/null ) || true
     export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
     if ! command -v moltbot &>/dev/null; then
       npm install -g moltbot@latest 2>/dev/null || pnpm add -g moltbot@latest 2>/dev/null || {
@@ -212,6 +213,8 @@ do_install() {
   chmod 700 "$CLAWDBOT_DIR"
 
   CONFIG_PATH="${CLAWDBOT_CONFIG_PATH:-$CLAWDBOT_DIR/moltbot.json}"
+  export CLAWDBOT_CONFIG_PATH="$CONFIG_PATH"
+  export CLAWDBOT_STATE_DIR="$CLAWDBOT_DIR"
 
   # --- Full Moltbot onboard (interactive wizard) ---
   echo
