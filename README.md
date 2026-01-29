@@ -1,26 +1,26 @@
-# clawd-script
+# moltbot-script
 
-Single-script VPS install for [Moltbot](https://docs.molt.bot/) (clawdbot). Runs the **full Moltbot onboard wizard** (auth + channels + daemon), then locks the gateway to loopback-only and optionally enables firewall and fail2ban.
+Single-script VPS install for [Moltbot](https://docs.molt.bot/). Runs the **full Moltbot onboard wizard** (auth + channels + daemon), then locks the gateway to loopback-only and optionally enables firewall and fail2ban. Directories follow [Moltbot docs](https://docs.molt.bot/): `~/.clawdbot` (config/state), `~/clawd` (workspace). Default run user: `moltbot`.
 
 ## Requirements
 
 - **Linux** — Debian or Ubuntu recommended (Node/jq/ufw/fail2ban auto-install). Other distros: install Node 22+ and jq yourself, then run the script.
 - **Node.js 22+** — Installed by the script on Debian/Ubuntu if missing.
-- **Root or sudo** — For installing Node/jq, creating user `clawdbot` (when run as root), firewall, and fail2ban.
+- **Root required** — The script must be run as root (e.g. `sudo ./install.sh`). Root is needed to create user `moltbot`, install packages, and install Node; the script then re-runs as `moltbot` for the rest.
 - **Interactive terminal** — The script runs `moltbot onboard --install-daemon`; you’ll choose auth (Z.ai, Anthropic, OpenAI, etc.) and channels (WhatsApp, Telegram, Discord, etc.) in the wizard.
 
 ## Quick start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/clawd-script/main/install-clawdbot-vps.sh | bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/moltbot-script/main/install.sh | sudo bash
 ```
 
-Or clone and run:
+Or clone and run (must be root):
 
 ```bash
-git clone https://github.com/YOUR_ORG/clawd-script.git
-cd clawd-script
-./install-clawdbot-vps.sh
+git clone https://github.com/YOUR_ORG/moltbot-script.git
+cd moltbot-script
+sudo ./install.sh
 ```
 
 ## Options
@@ -33,17 +33,17 @@ cd clawd-script
 
 **Environment (optional):**
 
-- `CLAWDBOT_USER` — User to create and run as when script is run as root (default: `clawdbot`).
-- `CLAWDBOT_CONFIG_PATH` — Override config path (default: `~/.clawdbot/moltbot.json`). Honored during install and in the systemd unit.
+- `MOLTBOT_USER` — User to create and run as when script is run as root (default: `moltbot`). Backward compat: `CLAWDBOT_USER` is also respected.
+- `CLAWDBOT_CONFIG_PATH` — Override config path (default: `~/.clawdbot/moltbot.json`). Per [Moltbot docs](https://docs.molt.bot/). Honored during install and in the systemd unit.
 
 ## What the script does
 
-1. **User** — If run as root, creates user `clawdbot` (or `$CLAWDBOT_USER`), adds minimal sudoers so that user can run `apt-get`, `ufw`, and `systemctl` during install, then re-execs the script as that user so the gateway does not run as root.
+1. **User** — If run as root, creates user `moltbot` (or `$MOLTBOT_USER`), adds minimal sudoers so that user can run `apt-get`, `ufw`, and `systemctl` during install, then re-execs the script as that user so the gateway does not run as root.
 2. **Required packages** — On Debian/Ubuntu, installs **curl**, **ca-certificates**, **jq**, and **gnupg** first if any are missing (so NodeSource and Moltbot install can run). On other OSes, the script requires curl and jq to be present and exits with instructions if not.
 3. **Node 22+** — Installs via NodeSource on Debian/Ubuntu if missing; otherwise checks version and exits if &lt; 22.
 4. **jq** — Already installed in step 2 on Debian/Ubuntu; otherwise the script requires it and exits.
 5. **Moltbot CLI** — Installs via [molt.bot/install.sh](https://molt.bot/install.sh) or `npm install -g moltbot@latest`.
-6. **Directories** — Creates `~/.clawdbot` (mode `700`) and `~/clawd` (or under the run user’s home).
+6. **Directories** — Creates `~/.clawdbot` (mode `700`) and `~/clawd` (per [Moltbot docs](https://docs.molt.bot/)), under the run user’s home.
 7. **Onboard wizard** — Runs `moltbot onboard --install-daemon` so you can:
    - Choose local vs remote gateway
    - Set auth (OAuth or API keys: Z.ai, Anthropic, OpenAI, etc.)
@@ -104,7 +104,7 @@ cd clawd-script
 | `~/clawd/` | Default agent workspace |
 | `~/.config/systemd/user/moltbot-gateway.service` | User unit, if written by script |
 
-When the script is run as root, all of the above are under the run user’s home (e.g. `/home/clawdbot`).
+When the script is run as root, all of the above are under the run user’s home (e.g. `/home/moltbot`).
 
 ## Docs
 
