@@ -191,6 +191,16 @@ do_install() {
   # --- Moltbot CLI ---
   # Ensure PATH includes user npm global bin (molt.bot/install.sh installs to ~/.npm-global/bin)
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
+  # Remove existing Moltbot install so we do a clean install
+  if command -v moltbot &>/dev/null; then
+    log "Removing existing Moltbot install..."
+    moltbot uninstall --yes 2>/dev/null || moltbot uninstall 2>/dev/null || true
+    npm uninstall -g moltbot 2>/dev/null || true
+    # Remove user install locations so upstream installer does a fresh install
+    rm -rf "${HOME}/.npm-global/bin/moltbot" "${HOME}/.npm-global/lib/node_modules/moltbot" 2>/dev/null || true
+    rm -rf "${HOME}/.local/bin/moltbot" "${HOME}/.local/lib/node_modules/moltbot" 2>/dev/null || true
+    unset MOLTBOT_BIN
+  fi
   if ! command -v moltbot &>/dev/null; then
     log "Installing Moltbot CLI..."
     # Upstream installer may run doctor at the end; it can fail until config exists — we run onboard next
@@ -310,14 +320,22 @@ EOF
   fi
 
   # --- Next steps ---
+  # Try to detect VPS public IP for copy-paste SSH command (run from your laptop)
+  VPS_IP=""
+  if command -v curl &>/dev/null; then
+    VPS_IP=$(curl -s --connect-timeout 2 -4 https://ifconfig.me/ip 2>/dev/null || curl -s --connect-timeout 2 -4 https://api.ipify.org 2>/dev/null) || true
+  fi
+  [[ -z "$VPS_IP" ]] && VPS_IP=$(hostname -I 2>/dev/null | awk '{print $1}') || true
+  [[ -z "$VPS_IP" || "$VPS_IP" =~ ^127\. ]] && VPS_IP="<YOUR_VPS_IP>"
+
   echo
   echo "=============================================="
   echo "  Moltbot VPS install complete"
   echo "=============================================="
   echo
-  echo "Gateway is bound to 127.0.0.1 only. To use the dashboard from your laptop:"
-  echo "  ssh -N -L 18789:127.0.0.1:18789 $(whoami)@<YOUR_VPS_IP>"
-  echo "Then open http://127.0.0.1:18789/ and paste your gateway token."
+  echo "Gateway is bound to 127.0.0.1 on this VPS only. From your laptop, create an SSH tunnel:"
+  echo "  ssh -N -L 18789:127.0.0.1:18789 $(whoami)@$VPS_IP"
+  echo "Then on your laptop open http://127.0.0.1:18789/ and paste your gateway token."
   echo
   if [[ -f "$CLAWDBOT_DIR/gateway-token.txt" ]]; then
     echo "Gateway token: $CLAWDBOT_DIR/gateway-token.txt"
