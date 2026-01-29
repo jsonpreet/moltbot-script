@@ -192,49 +192,65 @@ do_install() {
   # Ensure PATH includes user npm global bin (molt.bot/install.sh installs to ~/.npm-global/bin)
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
   
-  # Always remove existing Moltbot CLI so we do a clean install (service/data handled by moltbot uninstall)
+  # Always remove existing Moltbot CLI so we do a clean install
   log "Checking for existing Moltbot installation..."
+  # Try uninstall command (works with both moltbot and clawdbot command names)
   if command -v moltbot &>/dev/null; then
-    log "Removing existing Moltbot CLI..."
-    moltbot uninstall --all --yes 2>/dev/null || moltbot uninstall --yes 2>/dev/null || moltbot uninstall 2>/dev/null || true
+    log "Removing existing Moltbot via moltbot uninstall..."
+    moltbot uninstall --all --yes 2>/dev/null || moltbot uninstall --yes 2>/dev/null || true
   fi
-  # Remove npm global packages and common install locations
+  if command -v clawdbot &>/dev/null; then
+    log "Removing existing Moltbot via clawdbot uninstall..."
+    clawdbot uninstall --all --yes 2>/dev/null || clawdbot uninstall --yes 2>/dev/null || true
+  fi
+  # Remove npm global packages (try both package names)
   npm uninstall -g moltbot 2>/dev/null || true
+  npm uninstall -g clawdbot 2>/dev/null || true
+  # Remove binaries from common install locations
   rm -f "${HOME}/.npm-global/bin/moltbot" "${HOME}/.npm-global/bin/clawdbot" 2>/dev/null || true
-  rm -rf "${HOME}/.npm-global/lib/node_modules/moltbot" 2>/dev/null || true
+  rm -rf "${HOME}/.npm-global/lib/node_modules/moltbot" "${HOME}/.npm-global/lib/node_modules/clawdbot" 2>/dev/null || true
   rm -f "${HOME}/.local/bin/moltbot" "${HOME}/.local/bin/clawdbot" 2>/dev/null || true
-  rm -rf "${HOME}/.local/lib/node_modules/moltbot" 2>/dev/null || true
+  rm -rf "${HOME}/.local/lib/node_modules/moltbot" "${HOME}/.local/lib/node_modules/clawdbot" 2>/dev/null || true
   # Clear bash's command cache so it finds the new binary after install
   hash -r 2>/dev/null || true
   
   log "Installing Moltbot CLI (fresh install)..."
-  # Install moltbot via npm directly (simpler and more reliable than piping installer)
   # First ensure npm global directory exists and is configured
   mkdir -p "${HOME}/.npm-global/lib" "${HOME}/.npm-global/bin"
   npm config set prefix "${HOME}/.npm-global" 2>/dev/null || true
   
-  # Install moltbot (use || true to prevent set -e from exiting on failure)
-  npm install -g moltbot@latest || {
-    log "npm install failed, trying upstream installer..."
-    curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt --install-method npm || true
+  # Use the official Moltbot installer (the npm "moltbot" package is a placeholder)
+  # The installer knows the correct package name and install method
+  log "Running Moltbot upstream installer..."
+  curl -fsSL https://molt.bot/install.sh | bash -s -- --no-prompt || {
+    err "Moltbot installer failed"
+    exit 1
   }
   
-  # Update PATH and clear hash again
+  # Update PATH and clear hash
   export PATH="${HOME}/.npm-global/bin:${HOME}/.local/bin:${PATH}"
   hash -r 2>/dev/null || true
   
-  # Verify installation
+  # Find the moltbot binary (installer may use 'moltbot' or 'clawdbot' as the command name)
   MOLTBOT_BIN=""
-  if [[ -x "${HOME}/.npm-global/bin/moltbot" ]]; then
-    MOLTBOT_BIN="${HOME}/.npm-global/bin/moltbot"
-  elif command -v moltbot &>/dev/null; then
-    MOLTBOT_BIN="$(command -v moltbot)"
+  for binname in moltbot clawdbot; do
+    for bindir in "${HOME}/.npm-global/bin" "${HOME}/.local/bin" "/usr/local/bin"; do
+      if [[ -x "${bindir}/${binname}" ]]; then
+        MOLTBOT_BIN="${bindir}/${binname}"
+        break 2
+      fi
+    done
+  done
+  # Fallback to command -v
+  if [[ -z "$MOLTBOT_BIN" ]]; then
+    MOLTBOT_BIN="$(command -v moltbot 2>/dev/null || command -v clawdbot 2>/dev/null || true)"
   fi
   
   if [[ -z "$MOLTBOT_BIN" || ! -x "$MOLTBOT_BIN" ]]; then
-    err "moltbot not found after install. PATH=${PATH}"
-    err "Checked: ${HOME}/.npm-global/bin/moltbot"
-    ls -la "${HOME}/.npm-global/bin/" 2>/dev/null || true
+    err "moltbot/clawdbot not found after install. PATH=${PATH}"
+    err "Checked directories:"
+    ls -la "${HOME}/.npm-global/bin/" 2>/dev/null || echo "  ~/.npm-global/bin/ - not found or empty"
+    ls -la "${HOME}/.local/bin/" 2>/dev/null || echo "  ~/.local/bin/ - not found or empty"
     exit 1
   fi
   log "Moltbot CLI installed: $MOLTBOT_BIN"
@@ -371,12 +387,14 @@ EOF
     echo "  cat $CLAWDBOT_DIR/gateway-token.txt"
     echo
   fi
+  # Get the command name (moltbot or clawdbot) for instructions
+  MOLTBOT_CMD="$(basename "$MOLTBOT_BIN")"
   echo "Pairing is on by default; only approved users can talk to the bot."
-  echo "Approve pending pairings: moltbot pairing list <channel>"
-  echo "  moltbot pairing approve <channel> <CODE>"
+  echo "Approve pending pairings: $MOLTBOT_CMD pairing list <channel>"
+  echo "  $MOLTBOT_CMD pairing approve <channel> <CODE>"
   echo
   echo "Config: $CONFIG_PATH"
-  echo "If doctor reported fixable issues: moltbot doctor --fix"
+  echo "If doctor reported fixable issues: $MOLTBOT_CMD doctor --fix"
   echo
   echo "Docs: https://docs.molt.bot/"
   echo
