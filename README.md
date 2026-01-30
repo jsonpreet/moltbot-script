@@ -23,6 +23,14 @@ cd moltbot-script
 sudo ./install.sh
 ```
 
+**Full reinstall with OpenClaw** (uses [OpenClaw](https://github.com/openclaw/openclaw) instead of Moltbot):
+
+```bash
+sudo ./reinstall.sh
+```
+
+Creates user `openclaw`, installs `openclaw@latest` from npm, runs onboard wizard, then run gateway on boot with `./always-openclaw.sh` as root.
+
 ## Options
 
 | Flag | Description |
@@ -88,7 +96,8 @@ sudo ./install.sh
   moltbot pairing approve <channel> <CODE>
   ```
 
-- **Gateway service** — If you’re using the script’s systemd user unit:
+- **Gateway on boot (recommended)** — As **root** run from the repo: `./always.sh`. Or: `sudo cp /home/moltbot/.clawdbot/clawdbot-gateway.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable clawdbot-gateway && sudo systemctl start clawdbot-gateway`
+- **Gateway service (user unit)** — If you’re using the script’s systemd user unit:
   ```bash
   systemctl --user daemon-reload
   systemctl --user enable --now moltbot-gateway

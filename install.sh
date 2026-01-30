@@ -396,6 +396,35 @@ EOF
   echo
   echo "Docs: https://docs.molt.bot/"
   echo
+  # --- Run gateway on boot (systemd) ---
+  # Write systemd unit so root can install it (for curl | bash users who don't have always.sh)
+  GATEWAY_SERVICE="$CLAWDBOT_DIR/clawdbot-gateway.service"
+  cat > "$GATEWAY_SERVICE" << EOF
+[Unit]
+Description=Clawdbot Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+Group=$(whoami)
+Environment="PATH=$HOME/.npm-global/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="CLAWDBOT_CONFIG_PATH=$CONFIG_PATH"
+Environment="CLAWDBOT_STATE_DIR=$CLAWDBOT_DIR"
+ExecStart=$MOLTBOT_BIN gateway
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  chmod 644 "$GATEWAY_SERVICE"
+  log "Systemd unit saved to $GATEWAY_SERVICE (install as root to run on boot)"
+  echo
+  echo "To run the gateway on boot (survives reboot):"
+  echo "  As root run:  ./always.sh   (if you cloned the repo)"
+  echo "  Or as root:   cp $GATEWAY_SERVICE /etc/systemd/system/ && systemctl daemon-reload && systemctl enable clawdbot-gateway && systemctl start clawdbot-gateway"
+  echo
   # Remove temp script copy used for re-exec (so onboard had a TTY)
   [[ -n "${MOLTBOT_INSTALL_SCRIPT:-}" && -f "${MOLTBOT_INSTALL_SCRIPT}" ]] && rm -f "${MOLTBOT_INSTALL_SCRIPT}" 2>/dev/null || true
 }
