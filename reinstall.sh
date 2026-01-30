@@ -194,6 +194,15 @@ do_install() {
   export OPENCLAW_CONFIG_PATH="$CONFIG_PATH"
   log "Config will be at: $CONFIG_PATH"
 
+  # Add openclaw to PATH and env in shell profile so `openclaw` works when logging in as this user
+  if [[ -f "$HOME/.bashrc" ]]; then
+    if ! grep -q '\.npm-global/bin' "$HOME/.bashrc" 2>/dev/null; then
+      echo 'export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+      echo "export OPENCLAW_CONFIG_PATH=\"\$HOME/.openclaw/openclaw.json\"" >> "$HOME/.bashrc"
+      log "Added openclaw to PATH in ~/.bashrc"
+    fi
+  fi
+
   echo
   log "=========================================="
   log "Running OpenClaw setup wizard (interactive)"
