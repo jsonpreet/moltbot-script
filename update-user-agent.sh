@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-user-agent.sh — Patch openclaw src with 'antigravity/1.15.8' User-Agent and restart gateway
+# update-user-agent.sh — Patch OpenClaw to fix "outdated" Antigravity version warning
 # Usage: sudo ./update-user-agent.sh
 
 set -e
@@ -8,7 +8,7 @@ set -e
 OPENCLAW_USER="${OPENCLAW_USER:-openclaw}"
 CURRENT_USER="$(whoami)"
 
-echo "[update-user-agent] Starting patch for User-Agent..."
+echo "[update-user-agent] Starting patch for Antigravity version..."
 
 # 1. Determine where openclaw is installed.
 # We check the global install for the 'openclaw' user first, then system-wide.
@@ -40,18 +40,25 @@ if [[ -z "$OPENCLAW_PATH" ]]; then
 fi
 
 # 2. Apply patches using sed
-# We use sudo if we notice we aren't the owner, or just assume we have permissions if ran with sudo.
+# Target specifically the old Antigravity version string to fix the "outdated" warning.
+# Warning: The file path may vary slightly depending on flatten node_modules, so we search.
 
 echo "[update-user-agent] Patching files in $OPENCLAW_PATH ..."
 
-# Use find + sed to replace the generic User-Agent with the antigravity one
-# This command finds all .js files in the OpenClaw dir and replaces strict matches
-find "$OPENCLAW_PATH" -type f -name "*.js" -exec sed -i 's/"User-Agent": "antigravity"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} +
-
-# This command replaces the google-api-nodejs-client string
-find "$OPENCLAW_PATH" -type f -name "*.js" -exec sed -i 's/"User-Agent": "google-api-nodejs-client\/[^"]*"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} +
-
-echo "[update-user-agent] Patches applied successfully."
+# Fix: Replace 'antigravity/1.11.5' (or similar old versions) with 'antigravity/1.15.8'
+# This specifically fixes the "outdated" warning from the Gemini provider.
+if command -v find &>/dev/null && command -v sed &>/dev/null; then
+    # General replace for any "antigravity/1.xx.x" style string to the new version
+    find "$OPENCLAW_PATH" -type f -name "*.js" -exec sed -i 's/antigravity\/1\.[0-9]*\.[0-9]*/antigravity\/1.15.8/g' {} +
+    
+    # Also keep the general User-Agent patch just in case, but make it targeted
+    find "$OPENCLAW_PATH" -type f -name "*.js" -exec sed -i 's/"User-Agent": "antigravity"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} + 
+    
+    echo "[update-user-agent] Patches applied successfully."
+else
+    echo "[update-user-agent] ERROR: 'find' or 'sed' not found. Cannot patch."
+    exit 1
+fi
 
 # 3. Restart the service
 # We need to determine if it's a system service or a user service.

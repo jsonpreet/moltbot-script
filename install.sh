@@ -125,9 +125,9 @@ get_openclaw_home() {
   fi
 }
 
-# Patch User-Agent strings in OpenClaw source to fix Google/OAuth issues
+# Patch User-Agent strings in OpenClaw source to fix "outdated" Antigravity warning
 patch_openclaw_user_agent() {
-  log "Patching OpenClaw User-Agent to fix Google OAuth..."
+  log "Patching OpenClaw User-Agent to fix Google OAuth outdated warning..."
   local install_path=""
   # Try user global first (most common for this script)
   if [[ -d "${HOME}/.npm-global/lib/node_modules/openclaw" ]]; then
@@ -148,9 +148,13 @@ patch_openclaw_user_agent() {
 
   log "Found OpenClaw at: $install_path"
   if command -v find &>/dev/null && command -v sed &>/dev/null; then
+      # Fix specific old version strings that cause "outdated" warning
+      find "$install_path" -type f -name "*.js" -exec sed -i 's/antigravity\/1\.[0-9]*\.[0-9]*/antigravity\/1.15.8/g' {} + 2>/dev/null || true
+      
+      # General patch for "User-Agent": "antigravity"
       find "$install_path" -type f -name "*.js" -exec sed -i 's/"User-Agent": "antigravity"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} + 2>/dev/null || true
-      find "$install_path" -type f -name "*.js" -exec sed -i 's/"User-Agent": "google-api-nodejs-client\/[^"]*"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} + 2>/dev/null || true
-      log "User-Agent patched."
+      
+      log "User-Agent patched (antigravity/1.15.8 applied)."
   else
       log "find or sed not found. Skipping patch."
   fi
