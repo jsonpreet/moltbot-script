@@ -95,6 +95,44 @@ get_openclaw_home() {
   fi
 }
 
+# Patch User-Agent strings in OpenClaw source to fix Google/OAuth issues
+patch_openclaw_user_agent() {
+  log "Patching OpenClaw User-Agent to fix Google OAuth..."
+  local install_path=""
+  # Try user global first (most common for this script)
+  if [[ -d "${HOME}/.npm-global/lib/node_modules/openclaw" ]]; then
+    install_path="${HOME}/.npm-global/lib/node_modules/openclaw"
+  elif [[ -d "/usr/lib/node_modules/openclaw" ]]; then
+    install_path="/usr/lib/node_modules/openclaw"
+  elif [[ -d "/usr/local/lib/node_modules/openclaw" ]]; then
+     install_path="/usr/local/lib/node_modules/openclaw"
+  else
+    # Try to find via npm list
+    install_path="$(npm root -g 2>/dev/null)/openclaw"
+  fi
+
+  if [[ -z "$install_path" || ! -d "$install_path" ]]; then
+     log "Could not find OpenClaw install path for patching. Skipping."
+     return
+  fi
+
+  log "Found OpenClaw at: $install_path"
+  if command -v find &>/dev/null && command -v sed &>/dev/null; then
+      find "$install_path" -type f -name "*.js" -exec sed -i 's/"User-Agent": "antigravity"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} + 2>/dev/null || true
+      find "$install_path" -type f -name "*.js" -exec sed -i 's/"User-Agent": "google-api-nodejs-client\/[^"]*"/"User-Agent": "antigravity\/1.15.8 linux\/amd64"/g' {} + 2>/dev/null || true
+      log "User-Agent patched."
+  else
+      log "find or sed not found. Skipping patch."
+  fi
+  
+  # Restart service if running (user or system)
+  if systemctl --user is-active openclaw-gateway &>/dev/null; then
+     systemctl --user restart openclaw-gateway && log "Restarted openclaw-gateway (user)"
+  elif systemctl is-active openclaw-gateway &>/dev/null; then
+     sudo systemctl restart openclaw-gateway 2>/dev/null && log "Restarted openclaw-gateway (system)"
+  fi
+}
+
 do_install() {
   local os id_node
   os=$(detect_os)
@@ -102,7 +140,8 @@ do_install() {
 
   # Root: install deps, Node, create user, re-exec as openclaw
   if [[ "$(id -u)" -eq 0 ]] && [[ -z "${OPENCLAW_ALREADY_DROPPED:-}" ]]; then
-    # Stop existing clawdbot gateway if running (free port 18789)
+    # Stop existing openclaw gateway if running (free port 18789)
+    systemctl stop openclaw-gateway 2>/dev/null || true
     systemctl stop clawdbot-gateway 2>/dev/null || true
     ensure_required_packages "$os"
     if ! command -v node &>/dev/null; then
@@ -234,6 +273,9 @@ do_install() {
     chmod 600 "$CONFIG_PATH"
     log "Config patched: gateway bind=loopback"
   fi
+
+  # --- Patch User-Agent ---
+  patch_openclaw_user_agent
 
   if "$OPENCLAW_BIN" doctor --non-interactive 2>/dev/null; then
     log "openclaw doctor OK"

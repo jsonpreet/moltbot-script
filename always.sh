@@ -1,47 +1,47 @@
 #!/usr/bin/env bash
-# always.sh — Enable Clawdbot gateway as a systemd service (runs on boot, survives reboot)
+# always.sh — Enable OpenClaw gateway as a systemd service (runs on boot, survives reboot)
 # Run as root after install.sh has completed (e.g. sudo ./always.sh)
 
 set -e
 
-MOLTBOT_USER="${MOLTBOT_USER:-moltbot}"
-CLAWDBOT_HOME="$(eval echo ~$MOLTBOT_USER)"
-CONFIG_PATH="${CLAWDBOT_CONFIG_PATH:-$CLAWDBOT_HOME/.clawdbot/moltbot.json}"
-STATE_DIR="${CLAWDBOT_STATE_DIR:-$CLAWDBOT_HOME/.clawdbot}"
-# Prefer clawdbot binary (upstream name), fallback to moltbot
-CLAWDBOT_BIN=""
-for bin in clawdbot moltbot; do
-  if [[ -x "$CLAWDBOT_HOME/.npm-global/bin/$bin" ]]; then
-    CLAWDBOT_BIN="$CLAWDBOT_HOME/.npm-global/bin/$bin"
+OPENCLAW_USER="${OPENCLAW_USER:-openclaw}"
+OPENCLAW_HOME="$(eval echo ~$OPENCLAW_USER)"
+CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_HOME/.openclaw/openclaw.json}"
+STATE_DIR="${OPENCLAW_STATE_DIR:-$OPENCLAW_HOME/.openclaw}"
+# Prefer openclaw binary
+OPENCLAW_BIN=""
+for bin in openclaw moltbot clawdbot; do
+  if [[ -x "$OPENCLAW_HOME/.npm-global/bin/$bin" ]]; then
+    OPENCLAW_BIN="$OPENCLAW_HOME/.npm-global/bin/$bin"
     break
   fi
 done
-[[ -z "$CLAWDBOT_BIN" ]] && CLAWDBOT_BIN="$CLAWDBOT_HOME/.npm-global/bin/clawdbot"
+[[ -z "$OPENCLAW_BIN" ]] && OPENCLAW_BIN="$OPENCLAW_HOME/.npm-global/bin/openclaw"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo $0"
   exit 1
 fi
 
-if [[ ! -x "$CLAWDBOT_BIN" ]]; then
-  echo "Clawdbot binary not found at $CLAWDBOT_BIN. Run install.sh first as root."
+if [[ ! -x "$OPENCLAW_BIN" ]]; then
+  echo "OpenClaw binary not found at $OPENCLAW_BIN. Run install.sh first as root."
   exit 1
 fi
 
-echo "[always] Installing systemd service for Clawdbot gateway (user: $MOLTBOT_USER)"
-cat > /etc/systemd/system/clawdbot-gateway.service << EOF
+echo "[always] Installing systemd service for OpenClaw gateway (user: $OPENCLAW_USER)"
+cat > /etc/systemd/system/openclaw-gateway.service << EOF
 [Unit]
-Description=Clawdbot Gateway
+Description=OpenClaw Gateway
 After=network.target
 
 [Service]
 Type=simple
-User=$MOLTBOT_USER
-Group=$MOLTBOT_USER
-Environment="PATH=$CLAWDBOT_HOME/.npm-global/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="CLAWDBOT_CONFIG_PATH=$CONFIG_PATH"
-Environment="CLAWDBOT_STATE_DIR=$STATE_DIR"
-ExecStart=$CLAWDBOT_BIN gateway
+User=$OPENCLAW_USER
+Group=$OPENCLAW_USER
+Environment="PATH=$OPENCLAW_HOME/.npm-global/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="OPENCLAW_CONFIG_PATH=$CONFIG_PATH"
+Environment="OPENCLAW_STATE_DIR=$STATE_DIR"
+ExecStart=$OPENCLAW_BIN gateway
 Restart=on-failure
 RestartSec=10
 
@@ -50,11 +50,11 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable clawdbot-gateway
-systemctl start clawdbot-gateway
+systemctl enable openclaw-gateway
+systemctl start openclaw-gateway
 
-echo "[always] Clawdbot gateway is enabled and started."
-echo "  status: systemctl status clawdbot-gateway"
-echo "  logs:   journalctl -u clawdbot-gateway -f"
-echo "  stop:   systemctl stop clawdbot-gateway"
-echo "  start:  systemctl start clawdbot-gateway"
+echo "[always] OpenClaw gateway is enabled and started."
+echo "  status: systemctl status openclaw-gateway"
+echo "  logs:   journalctl -u openclaw-gateway -f"
+echo "  stop:   systemctl stop openclaw-gateway"
+echo "  start:  systemctl start openclaw-gateway"
